@@ -68,7 +68,11 @@ export function useTuner(inputThreshold = 0.006, inputGain = 1.5) {
       const buffer = new Float32Array(analyser.fftSize)
       const audio = { context: activeContext, stream, gainNode, analyser, frame: 0 }
       let lastProcess = 0
+      let lastDisplay = 0
       let lastDetected: number | null = null
+      let displayFrequency: number | null = null
+      let displayLevel = 0
+      let displayTooLoud = false
       audioRef.current = audio
       setState({ running: true, frequency: null, level: 0, tooLoud: false, error: null })
       const tick = () => {
@@ -87,7 +91,20 @@ export function useTuner(inputThreshold = 0.006, inputGain = 1.5) {
           else if (tooLoud || level < analysisThreshold * 0.5) historyRef.current = []
           lastDetected = detected
         }
-        setState(current => ({ ...current, frequency: lastDetected, level, tooLoud }))
+        const now = performance.now()
+        if (now - lastDisplay >= 120) {
+          lastDisplay = now
+          if (lastDetected === null) displayFrequency = null
+          else if (displayFrequency === null) displayFrequency = lastDetected
+          else {
+            const jump = Math.abs(lastDetected - displayFrequency) / Math.max(displayFrequency, 1)
+            const alpha = jump > 0.08 ? 0.8 : 0.35
+            displayFrequency += (lastDetected - displayFrequency) * alpha
+          }
+          displayLevel += (level - displayLevel) * 0.35
+          displayTooLoud = tooLoud
+          setState(current => ({ ...current, frequency: displayFrequency, level: displayLevel, tooLoud: displayTooLoud }))
+        }
         audio.frame = requestAnimationFrame(tick)
       }
       audio.frame = requestAnimationFrame(tick)
