@@ -1,0 +1,59 @@
+# pitchleaf
+
+ブラウザのマイクでギターの音程を測る、スマホ対応のクロマチックチューナーです。音声の解析はすべてブラウザ内で完結し、サーバーへ音声を送信しません。
+
+## 主な機能
+
+- Web Audio API と YIN 法によるリアルタイムのピッチ検出
+- ギター標準チューニング（E2 / A2 / D3 / G3 / B3 / E4）
+- 検出音名、周波数（Hz）、目標音からのズレ（cent）表示
+- ±50 cent メーターと ±4 cent の「合っている」表示
+- ノイズ・小音量時の無理な音名表示を抑制し、検出を平滑化
+- A4 = 430〜450Hz（1Hz刻み）の基準ピッチ調整
+- 基準ピッチの localStorage 保存
+- ダークテーマ、縦画面・横画面のレスポンシブ UI
+
+## 必要環境
+
+- Node.js 22 以上
+- npm
+- マイクが使えるブラウザ（Safari / Chrome / Firefox など）
+
+## 開発
+
+```sh
+cd frontend
+npm install
+npm run dev
+```
+
+ブラウザで表示された URL を開き、「マイクを開始」をタップしてください。ビルドは次のコマンドです。
+
+```sh
+cd frontend
+npm run build
+```
+
+## GitHub Pages 公開
+
+「main」ブランチへ push すると、.github/workflows/deploy.yml が frontend をビルドして GitHub Pages へ公開します。
+
+初回のみ GitHub リポジトリの Settings → Pages で、Source を GitHub Actions に設定してください。公開 URL は https://kiwamu25.github.io/pitchleaf/ です。
+
+Vite の base は /pitchleaf/ に設定済みなので、リポジトリ名配下でもアセットを読み込めます。
+
+## マイク権限と HTTPS
+
+マイク入力はブラウザの権限が必要です。GitHub Pages の HTTPS URL では利用できますが、通常の HTTP ページではブラウザがマイクを拒否します（localhost は開発用の例外です）。音声データはこのページ内で解析され、ネットワークへ送信されません。
+
+## iPhone Safari で使うとき
+
+- 最初に「マイクを開始」をタップしてから AudioContext を開始する設計です。
+- Safari のサイト設定でマイクを許可してください。
+- 消音モードでも利用できますが、イヤホンのマイクを使う場合は入力先を確認してください。
+- 弦を1本ずつ、スマホから少し離して鳴らすと安定します。
+- 画面をロックしたり別アプリへ移動すると、Safari が音声処理を停止することがあります。
+
+## ライセンス
+
+個人利用向けの小さなブラウザアプリです。

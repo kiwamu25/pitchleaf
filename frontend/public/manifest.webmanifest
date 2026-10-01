@@ -1,0 +1,13 @@
+{
+  "id": "/pitchleaf/",
+  "name": "pitchleaf Guitar Tuner",
+  "short_name": "pitchleaf",
+  "description": "ブラウザだけで使えるギター用クロマチックチューナー",
+  "lang": "ja",
+  "start_url": "/pitchleaf/",
+  "scope": "/pitchleaf/",
+  "display": "standalone",
+  "theme_color": "#101513",
+  "background_color": "#101513",
+  "icons": []
+}
