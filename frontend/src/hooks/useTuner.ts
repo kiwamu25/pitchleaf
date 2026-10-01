@@ -31,7 +31,9 @@ function yin(buffer: Float32Array, sampleRate: number) {
 }
 function rms(buffer: Float32Array) { let sum = 0; for (const sample of buffer) sum += sample * sample; return Math.sqrt(sum / buffer.length) }
 
-export function useTuner() {
+export function useTuner(inputThreshold = 0.006) {
+  const thresholdRef = useRef(inputThreshold)
+  useEffect(() => { thresholdRef.current = inputThreshold }, [inputThreshold])
   const [state, setState] = useState<TunerState>({ running: false, frequency: null, level: 0, error: null })
   const audioRef = useRef<{ context: AudioContext; stream: MediaStream; analyser: AnalyserNode; frame: number } | null>(null)
   const historyRef = useRef<number[]>([])
@@ -71,9 +73,10 @@ export function useTuner() {
         const level = rms(buffer)
         if (performance.now() - lastProcess >= 50) {
           lastProcess = performance.now()
-          let detected = level > 0.008 ? yin(buffer, activeContext.sampleRate) : null
+          const analysisThreshold = thresholdRef.current
+          let detected = level > analysisThreshold ? yin(buffer, activeContext.sampleRate) : null
           if (detected) { const history = [...historyRef.current, detected].slice(-5); historyRef.current = history; const sorted = [...history].sort((a, b) => a - b); detected = sorted[Math.floor(sorted.length / 2)] }
-          else if (level < 0.004) historyRef.current = []
+          else if (level < analysisThreshold * 0.5) historyRef.current = []
           lastDetected = detected
         }
         setState(current => ({ ...current, frequency: lastDetected, level }))

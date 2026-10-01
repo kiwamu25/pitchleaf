@@ -3,6 +3,10 @@ import './App.css'
 import { useTuner } from './hooks/useTuner'
 
 const STORAGE_KEY = 'pitchleaf.reference-pitch'
+const SENSITIVITY_STORAGE_KEY = 'pitchleaf.input-sensitivity'
+const MIN_SENSITIVITY = 0.003
+const MAX_SENSITIVITY = 0.012
+const DEFAULT_SENSITIVITY = 0.006
 const MIN_PITCH = 430
 const MAX_PITCH = 450
 const strings = [
@@ -17,8 +21,15 @@ function App() {
     const stored = Number(localStorage.getItem(STORAGE_KEY))
     return Number.isFinite(stored) && stored >= MIN_PITCH && stored <= MAX_PITCH ? stored : 440
   })
-  const tuner = useTuner()
+  const [sensitivityThreshold, setSensitivityThreshold] = useState(() => {
+    const stored = Number(localStorage.getItem(SENSITIVITY_STORAGE_KEY))
+    return Number.isFinite(stored) && stored >= MIN_SENSITIVITY && stored <= MAX_SENSITIVITY ? stored : DEFAULT_SENSITIVITY
+  })
+  const tuner = useTuner(sensitivityThreshold)
   useEffect(() => { localStorage.setItem(STORAGE_KEY, String(referencePitch)) }, [referencePitch])
+  useEffect(() => { localStorage.setItem(SENSITIVITY_STORAGE_KEY, String(sensitivityThreshold)) }, [sensitivityThreshold])
+  const sensitivityLabel = sensitivityThreshold <= 0.0045 ? '高' : sensitivityThreshold >= 0.009 ? '低' : '標準'
+  const sensitivityWarning = sensitivityThreshold <= 0.0045
   const target = useMemo(() => {
     if (!tuner.frequency) return null
     return strings.map(string => ({ ...string, frequency: frequencyForMidi(string.midi, referencePitch) }))
@@ -42,6 +53,7 @@ function App() {
         {tuner.error && <p className="error-message" role="alert">{tuner.error}</p>}{tuner.running && <div className="level" aria-label={'入力レベル ' + levelPercent + '%'}><span>入力レベル</span><div><i style={{ width: levelPercent + '%' }} /></div></div>}
       </section>
       <section className="settings-card" aria-labelledby="settings-title"><div className="settings-heading"><div><p className="eyebrow">REFERENCE PITCH</p><h2 id="settings-title">基準ピッチ</h2></div><strong>{referencePitch}<small> Hz</small></strong></div><div className="pitch-controls"><input aria-label="基準ピッチ" type="range" min={MIN_PITCH} max={MAX_PITCH} step="1" value={referencePitch} onChange={event => setReferencePitch(Number(event.target.value))} /><input aria-label="基準ピッチ（数値）" className="pitch-number" type="number" min={MIN_PITCH} max={MAX_PITCH} step="1" value={referencePitch} onChange={event => { const value = Number(event.target.value); if (value >= MIN_PITCH && value <= MAX_PITCH) setReferencePitch(value) }} /><button type="button" onClick={() => setReferencePitch(440)} disabled={referencePitch === 440}>440Hzに戻す</button></div><p className="settings-help">A4 = {referencePitch}Hz · 430〜450Hz · 1Hz刻み</p></section>
+      <section className="settings-card sensitivity-card" aria-labelledby="sensitivity-title"><div className="settings-heading"><div><p className="eyebrow">INPUT SENSITIVITY</p><h2 id="sensitivity-title">入力感度</h2></div><strong>{sensitivityLabel}<small> 感度</small></strong></div><div className="pitch-controls sensitivity-controls"><input aria-label="入力感度" type="range" min={MIN_SENSITIVITY} max={MAX_SENSITIVITY} step="0.001" value={sensitivityThreshold} onChange={event => setSensitivityThreshold(Number(event.target.value))} /><output className="sensitivity-value">RMS {sensitivityThreshold.toFixed(3)}</output></div><div className="sensitivity-scale"><span>高感度・小音量向け</span><span>低感度・ノイズに強い</span></div>{sensitivityWarning && <p className="sensitivity-warning" role="status">高感度では周囲のノイズも音として拾いやすくなります。</p>}<p className="settings-help">解析開始の閾値を調整します。音量不足なら左へ、ノイズが多ければ右へ。</p></section>
       <section className="strings-card" aria-labelledby="strings-title"><div className="strings-heading"><div><p className="eyebrow">STANDARD TUNING</p><h2 id="strings-title">ギターの標準チューニング</h2></div><span>目標周波数</span></div><div className="string-list">{strings.map((string, index) => <div className={'string-row ' + (target?.name === string.name ? 'selected' : '')} key={string.name}><span className="string-number">{index + 1}</span><strong>{string.name}</strong><span>{frequencyForMidi(string.midi, referencePitch).toFixed(2)} Hz</span></div>)}</div></section>
     </main>
     <footer><span>pitchleaf</span><span>音程は端末上で処理され、音声は送信されません。</span></footer>
