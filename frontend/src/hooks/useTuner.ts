@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-type TunerState = { running: boolean; frequency: number | null; level: number; error: string | null }
+type TunerState = { running: boolean; frequency: number | null; level: number; tooLoud: boolean; error: string | null }
 type SafariWindow = Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }
 
 function yin(buffer: Float32Array, sampleRate: number) {
@@ -31,18 +31,20 @@ function yin(buffer: Float32Array, sampleRate: number) {
 }
 function rms(buffer: Float32Array) { let sum = 0; for (const sample of buffer) sum += sample * sample; return Math.sqrt(sum / buffer.length) }
 
-export function useTuner(inputThreshold = 0.006) {
+export function useTuner(inputThreshold = 0.006, inputGain = 1.5) {
   const thresholdRef = useRef(inputThreshold)
+  const gainRef = useRef(inputGain)
   useEffect(() => { thresholdRef.current = inputThreshold }, [inputThreshold])
-  const [state, setState] = useState<TunerState>({ running: false, frequency: null, level: 0, error: null })
-  const audioRef = useRef<{ context: AudioContext; stream: MediaStream; analyser: AnalyserNode; frame: number } | null>(null)
+  useEffect(() => { gainRef.current = inputGain }, [inputGain])
+  const [state, setState] = useState<TunerState>({ running: false, frequency: null, level: 0, tooLoud: false, error: null })
+  const audioRef = useRef<{ context: AudioContext; stream: MediaStream; gainNode: GainNode; analyser: AnalyserNode; frame: number } | null>(null)
   const historyRef = useRef<number[]>([])
   const stop = useCallback(async () => {
     const audio = audioRef.current
     audioRef.current = null
     if (audio) { cancelAnimationFrame(audio.frame); audio.stream.getTracks().forEach(track => track.stop()); await audio.context.close() }
     historyRef.current = []
-    setState({ running: false, frequency: null, level: 0, error: null })
+    setState({ running: false, frequency: null, level: 0, tooLoud: false, error: null })
   }, [])
   const start = useCallback(async () => {
     if (audioRef.current) return
@@ -58,35 +60,41 @@ export function useTuner(inputThreshold = 0.006) {
       const activeContext = context
       if (!activeContext) throw new Error('AudioContext was not created')
       const analyser = activeContext.createAnalyser()
+      const gainNode = activeContext.createGain()
+      gainNode.gain.value = gainRef.current
       analyser.fftSize = 4096
       analyser.smoothingTimeConstant = 0
-      activeContext.createMediaStreamSource(stream).connect(analyser)
+      activeContext.createMediaStreamSource(stream).connect(gainNode).connect(analyser)
       const buffer = new Float32Array(analyser.fftSize)
-      const audio = { context: activeContext, stream, analyser, frame: 0 }
+      const audio = { context: activeContext, stream, gainNode, analyser, frame: 0 }
       let lastProcess = 0
       let lastDetected: number | null = null
       audioRef.current = audio
-      setState({ running: true, frequency: null, level: 0, error: null })
+      setState({ running: true, frequency: null, level: 0, tooLoud: false, error: null })
       const tick = () => {
         if (audioRef.current !== audio) return
         analyser.getFloatTimeDomainData(buffer)
+        const peak = buffer.reduce((maximum, sample) => Math.max(maximum, Math.abs(sample)), 0)
         const level = rms(buffer)
+        const tooLoud = peak >= 0.98 || level >= 0.45
+        const currentGain = gainRef.current
+        if (Math.abs(gainNode.gain.value - currentGain) > 0.001) gainNode.gain.setTargetAtTime(currentGain, activeContext.currentTime, 0.01)
         if (performance.now() - lastProcess >= 50) {
           lastProcess = performance.now()
           const analysisThreshold = thresholdRef.current
-          let detected = level > analysisThreshold ? yin(buffer, activeContext.sampleRate) : null
+          let detected = !tooLoud && level > analysisThreshold ? yin(buffer, activeContext.sampleRate) : null
           if (detected) { const history = [...historyRef.current, detected].slice(-5); historyRef.current = history; const sorted = [...history].sort((a, b) => a - b); detected = sorted[Math.floor(sorted.length / 2)] }
-          else if (level < analysisThreshold * 0.5) historyRef.current = []
+          else if (tooLoud || level < analysisThreshold * 0.5) historyRef.current = []
           lastDetected = detected
         }
-        setState(current => ({ ...current, frequency: lastDetected, level }))
+        setState(current => ({ ...current, frequency: lastDetected, level, tooLoud }))
         audio.frame = requestAnimationFrame(tick)
       }
       audio.frame = requestAnimationFrame(tick)
     } catch (error) {
       if (context) await context.close().catch(() => undefined)
       const message = error instanceof DOMException && error.name === 'NotAllowedError' ? 'マイクの使用が許可されていません。ブラウザの設定からマイクを許可してください。' : 'マイクを開始できませんでした。HTTPS接続とデバイス設定を確認してください。'
-      setState({ running: false, frequency: null, level: 0, error: message })
+      setState({ running: false, frequency: null, level: 0, tooLoud: false, error: message })
     }
   }, [])
   useEffect(() => () => { void stop() }, [stop])
