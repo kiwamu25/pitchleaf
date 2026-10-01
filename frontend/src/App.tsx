@@ -32,7 +32,7 @@ function App() {
   return <div className="app-shell">
     <header className="app-header"><a className="wordmark" href="./">pitchleaf<span>guitar tuner</span></a><div className="header-note">STANDARD · E A D G B E</div></header>
     <main>
-      <section className="hero" aria-labelledby="page-title"><p className="eyebrow">CHROMATIC GUITAR TUNER</p><h1 id="page-title">音をひとつ、<em>まっすぐに。</em></h1><p className="lead">マイクに向かって弦を鳴らしてください。検出はこのブラウザの中だけで行われます。</p></section>
+      <section className="hero"><p className="eyebrow">CHROMATIC GUITAR TUNER</p><p className="lead">マイクに向かって弦を鳴らしてください。検出はこのブラウザの中だけで行われます。</p></section>
       <section className="tuner-card" aria-label="チューナー">
         <div className="readout"><div className={'status-dot ' + (tuner.running ? 'live' : '')} aria-hidden="true" /><span>{tuner.error ? 'マイクを確認してください' : tuner.running ? (tuner.frequency ? '検出中' : '音を待っています') : 'マイクは停止中'}</span></div>
         <div className={'note-display ' + (inTune ? 'in-tune' : '')} aria-live="polite"><span className="detected-note">{target?.name ?? '--'}</span><span className="target-note">{target ? '目標 ' + target.name : '弦を鳴らすと音名を表示します'}</span></div>
